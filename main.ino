@@ -1,3 +1,7 @@
+/*************************************/
+/******General Overview of Code*******/
+/*************************************/
+/****** *Line: setup();*************/
 #define TEMPPIN 0
 
 void setup() {
@@ -27,14 +31,17 @@ typedef struct ringbuffer {
 
 /* For request function */
 int     input   =   0;
+int     arput   =   0;
 bool    check   =   false;
 bool    valid   =   false;
+bool    arval   =   false;
 
 /* Request function */
 int request() {
   String inputTemp = "";
   check = false;
   valid = false;
+  arval = false;
   while (Serial.available() != 0) {
     check = true;
     inputTemp += char(Serial.read());
@@ -42,9 +49,16 @@ int request() {
     if (Serial.available() == 0) {
       //Serial.println(inputTemp);
       input = inputTemp.toInt();
+      /*check if valid for menu*/
       if (input>0&&input<5){
         valid = true;
       }
+      /*check if valid for array altering*/
+      if (input>0&&input<201){
+        arval = true;
+        arput = input;
+      }
+      /*invalid input for menu*/
       else{
         valid = false;
             input=0;
@@ -110,6 +124,7 @@ void printData(int data){
   			}
       }
     	Serial.println("Your new value has been accepted");
+    	ring.soft=arput;
     	
     	break;
     /* Default */
