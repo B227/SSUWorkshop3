@@ -70,26 +70,27 @@ int request() {
 
 
   /*  Mean Function */
-int Mean(struct ringbuffer mean_number){
+int Mean(struct ring_buffer meannumber){
    /*  Compute  Mean */
   int addup=0;
-  for(int i = mean_number.head; i <= mean_number.tail; i++){
-    addup += mean_number.buffer[i];
+  for(int i = 0; i < meannumber.tail; i++){
+    addup += meannumber.buff[i];
   }
-  addup /= mean_number.count;
+  addup /= meannumber.tail;
   return addup;
 }
-
   /*  Variance Function */
-int Std(struct ringbuffer std) {
-  /*  Define for Variance */
+int Std(struct ring_buffer std) {
+  //  Define for Variance
   int sum1 = 0;
-  /*  Compute  Variance */
-  for (int i = std.head; i < std.tail; i++)
+  int mean = Mean(std);
+  //  Compute  Variance
+  
+  for (int i = 0; i < std.tail; i++)
   {
-    sum1 += pow((std.buffer[i] - Mean(ring)), 2);
+    sum1 += pow((std.buff[i] - mean), 2);
   }
-  sum1 /= std.count;
+  sum1 /= std.tail;
   sum1 = sqrt(sum1);
   return sum1;
 }
