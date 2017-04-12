@@ -1,8 +1,10 @@
 /*************************************/
 /******General Overview of Code*******/
 /*************************************/
-/****** *Line: setup();*************/
 #define TEMPPIN 0
+#define CAPACITY 200
+
+unsigned long time = 0;
 
 void setup() {
   /* General Arduino Setup*/
@@ -10,58 +12,103 @@ void setup() {
   while (!Serial) {
     ; // wait for serial port to connect. Needed for native USB port only
   }
+
 }
 
-int Tempuratur(){
-  int tempReading = analogRead(TEMPPIN);  
+// For menu function
+bool    menucheck   =   true;
+
+// Menu function
+void menu() {
+  if (menucheck == true) {
+    Serial.println("Welcome to the weather station");
+    Serial.println("Type the appropriate number to choose one of the following options:");
+    Serial.println("1 - Show Mean");
+    Serial.println("2 - Show Varians");
+    Serial.println("3 - View the buffer length");
+    Serial.println("4 - Change the buffer length");
+    menucheck = false;
+  }
+}
+
+int Tempuratur() {
+  int tempReading = analogRead(TEMPPIN);
   float voltage = tempReading * 5.0;
   voltage /= 1024.0;
   float temp = (voltage - 0.5) * 100;
   return temp;
 }
 
-/* Temp struct Start */
-typedef struct ringbuffer {
-  int buffer[200];
+/* Struct Start */
+struct ring_buffer
+{
+  int buff[CAPACITY];
   int head = 0;
-  int tail = 0;
-  int count = 0;
-}ring;
-/* Temp Struct End */
+  int tail = 0; //pointer to head
+  int soft = CAPACITY; //pointer to max (user setting)
+} ring;
+/* Struct End */
 
-/* For request function */
+/* RingBuffer */
+void writeToBuffer(int sensorValue, struct ring_buffer *cir) {
+  int temTail = cir->tail;
+  int temSoft = cir->soft;
+  if (temTail < temSoft)
+  {
+    cir->buff[temTail] = sensorValue;
+    cir->tail++;
+  }
+  else
+  {
+    cir->tail = temSoft;
+    int i;
+    for (i = 0; i < temSoft - 1; i++)
+    {
+      cir->buff[i] = cir->buff[temTail - temSoft + i + 1];
+    }
+    cir->buff[temSoft - 1] = sensorValue;
+  }
+}
+/* end RingBuffer */
+
+// For request function
 int     input   =   0;
 int     arput   =   0;
 bool    check   =   false;
 bool    valid   =   false;
 bool    arval   =   false;
 
-/* Request function */
+// Request function
 int request() {
   String inputTemp = "";
   check = false;
   valid = false;
   arval = false;
   while (Serial.available() != 0) {
+    
     check = true;
     inputTemp += char(Serial.read());
+    Serial.println(inputTemp);
     delay(5);
+    
     if (Serial.available() == 0) {
+      
       //Serial.println(inputTemp);
       input = inputTemp.toInt();
-      /*check if valid for menu*/
-      if (input>0&&input<5){
+      //check if valid for menu
+      if (input > 0 && input < 5) {
         valid = true;
+        menucheck = true;
       }
-      /*check if valid for array altering*/
-      if (input>0&&input<201){
+      //invalid input for menu
+      else {
+        valid = false;
+        input = 0;
+      }
+      //check if valid for array altering
+      if (input > 0 && input < 201) {
         arval = true;
         arput = input;
-      }
-      /*invalid input for menu*/
-      else{
-        valid = false;
-            input=0;
       }
     }
   }
@@ -69,23 +116,26 @@ int request() {
 }
 
 
-  /*  Mean Function */
-int Mean(struct ring_buffer meannumber){
-   /*  Compute  Mean */
-  int addup=0;
-  for(int i = 0; i < meannumber.tail; i++){
+
+/*  Mean Function */
+int Mean(struct ring_buffer meannumber) {
+  // Compute  Mean
+  int addup = meannumber.buff[0];
+  for (int i = 1; i < meannumber.tail; i++) {
     addup += meannumber.buff[i];
   }
   addup /= meannumber.tail;
   return addup;
 }
-  /*  Variance Function */
+
+
+/*  Variance Function */
 int Std(struct ring_buffer std) {
   //  Define for Variance
   int sum1 = 0;
   int mean = Mean(std);
+  //Serial.println(mean);
   //  Compute  Variance
-  
   for (int i = 0; i < std.tail; i++)
   {
     sum1 += pow((std.buff[i] - mean), 2);
@@ -95,45 +145,57 @@ int Std(struct ring_buffer std) {
   return sum1;
 }
 
-void printData(int data){
-  switch(data){
+void printData(int data) {
+  switch (data) {
     /* Show Mean Value */
-    case 1: 
-    	Serial.print("Mean is: "); 
-    	Serial.println(Mean(ring)); 
-    	break;
+    case 1:
+      Serial.print("Mean is: ");
+      Serial.println(Mean(ring));
+      break;
     /* Show Varians Value */
-  	case 2: 
-    	Serial.print("Varians is: "); 
-    	Serial.println(Std(ring)); 
-    	break;
+    case 2:
+      Serial.print("Varians is: ");
+      Serial.println(Std(ring));
+      break;
     /* View the buffer length */
-    case 3: 
-    	Serial.print("The buffer length is: "); 
-    	Serial.println(ring.soft); 
-    	break;
+    case 3:
+      Serial.print("The buffer length is: ");
+      Serial.println(ring.soft);
+      break;
     /* Change the buffer length */
     case 4:
-    	Serial.print("You have chosen to alter the buffer length. Insert new value!")
-      while (arVal==false) {
+      Serial.println("You have chosen to alter the buffer length. Insert new value!");
+      arval=false;
+      while (arval == false) {
         request();
-        if (check == 1) {
-    			if (valid == 0){
-      			Serial.print("Invalid buffer length");
+        
+        if (check == true) {
+          
+          if (arval == false) {
+            Serial.println("Invalid buffer length");
 
           }
-  			}
+        }
       }
-    	Serial.println("Your new value has been accepted");
-    	ring.soft=arput;
-    	
-    	break;
-    /* Default */
-    default: Serial.print("Something went wrong");
+      Serial.println("Your new value has been accepted");
+      ring.soft = arput;
+
+      break;
+      /* Default */
+      // default: Serial.print("Something went wrong");
   }
 }
 
 void loop() {
-  /* Loop Stuff Here*/
+  menu();
+  if (time < millis()) {
+    writeToBuffer(Tempuratur(), &ring);
+    time = millis();
+  }
+  request();
+  if (valid==true) {
+    printData(input);
+  }
+
 }
-/**/
+
